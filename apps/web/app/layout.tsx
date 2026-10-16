@@ -2,7 +2,9 @@ import { Geist, Geist_Mono, Instrument_Sans, Instrument_Serif } from "next/font/
 
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@workspace/ui/lib/utils";
+import { cn } from "@workspace/ui/lib/utils"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 
 const instrumentSerifHeading = Instrument_Serif({subsets:['latin'],weight:['400'],variable:'--font-heading'});
 
@@ -24,9 +26,15 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", instrumentSans.variable, instrumentSerifHeading.variable)}
     >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
+    <body>
+    <ThemeProvider>
+      <SiteHeader />
+      <div className="flex">
+        <AppSidebar />
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </ThemeProvider>
+    </body>
     </html>
   )
 }
