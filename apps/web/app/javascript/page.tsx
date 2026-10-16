@@ -3,7 +3,7 @@ import { ArrowUpRight, BookOpen, MoveRight } from "lucide-react";
 import { Curriculum } from "@/lib/lessons";
 
 export const metadata = {
-  title: "Async Academy",
+  title: "Learn JavaScript",
 };
 
 export default function Page() {
@@ -25,9 +25,9 @@ export default function Page() {
             Learn <span className="text-primary">JavaScript</span> at your
             own pace.
           </h1>
-          <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-            Clear lessons for curious people. Pick up where you left off, or
-            wander into something new.
+          <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg text-pretty">
+            Short lessons with code you can run, and small coding challenges to lock
+            each one in. Start at the top, or jump to what you need.
           </p>
         </div>
         <Link
