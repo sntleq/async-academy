@@ -20,6 +20,9 @@ export function TableOfContents({ containerId }: { containerId: string }) {
     const elements = Array.from(
       container.querySelectorAll("h2, h3")
     ) as HTMLElement[];
+    const scrollRoot = container.closest<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]'
+    );
 
     setHeadings(
       elements.map((el) => ({
@@ -34,7 +37,7 @@ export function TableOfContents({ containerId }: { containerId: string }) {
         const visible = entries.find((entry) => entry.isIntersecting);
         if (visible) setActiveId(visible.target.id);
       },
-      { rootMargin: "0px 0px -80% 0px" }
+      { root: scrollRoot, rootMargin: "0px 0px -80% 0px" }
     );
 
     elements.forEach((el) => observer.observe(el));
@@ -44,21 +47,22 @@ export function TableOfContents({ containerId }: { containerId: string }) {
   if (headings.length === 0) return null;
 
   return (
-    <nav className="sticky top-16 hidden max-h-[calc(100vh-4rem)] w-64 shrink-0 flex-col gap-2 overflow-y-auto py-16 text-sm xl:flex">
-      <p className="font-heading text-2xl font-medium mb-2">On This Page</p>
+    <nav className="sticky top-0 hidden max-h-[calc(100dvh-4rem)] w-72 shrink-0 flex-col gap-2 overflow-y-auto py-16 text-sm xl:flex">
+      <p className="mb-2 font-heading text-2xl font-medium">On This Page</p>
       {headings.map((heading) => (
         <a
           key={heading.id}
           href={`#${heading.id}`}
+          onClick={() => setActiveId(heading.id)}
           className={cn(
-          "text-muted-foreground transition-colors hover:text-foreground",
-          heading.level === 3 && "pl-4",
-          activeId === heading.id && "font-medium text-foreground"
+            "text-muted-foreground transition-colors hover:text-primary",
+            heading.level === 3 && "pl-4",
+            activeId === heading.id && "font-medium text-primary"
           )}
         >
           {heading.text}
         </a>
-        ))}
-</nav>
-);
+      ))}
+    </nav>
+  );
 }

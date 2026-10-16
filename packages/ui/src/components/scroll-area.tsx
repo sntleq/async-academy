@@ -1,14 +1,31 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area"
-import { cn } from "cn"
+import * as React from "react";
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
+import { cn } from "cn";
 
 function ScrollArea({
   className,
   children,
+  autoHide = false,
   ...props
-}: ScrollAreaPrimitive.Root.Props) {
+}: ScrollAreaPrimitive.Root.Props & { autoHide?: boolean }) {
+  const [isScrolling, setIsScrolling] = React.useState(false);
+  const hideTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    };
+  }, []);
+
+  function handleScroll() {
+    if (!autoHide) return;
+    setIsScrolling(true);
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    hideTimeout.current = setTimeout(() => setIsScrolling(false), 700);
+  }
+
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -17,14 +34,20 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none" // removed focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1
+        onScroll={handleScroll}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
+      <ScrollBar
+        className={cn(
+          autoHide && "transition-opacity duration-200",
+          autoHide && !isScrolling && "pointer-events-none opacity-0"
+        )}
+      />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
-  )
+  );
 }
 
 function ScrollBar({
@@ -48,7 +71,7 @@ function ScrollBar({
         className="relative flex-1 rounded-full bg-border"
       />
     </ScrollAreaPrimitive.Scrollbar>
-  )
+  );
 }
 
-export { ScrollArea, ScrollBar }
+export { ScrollArea, ScrollBar };
