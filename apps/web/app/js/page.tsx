@@ -22,12 +22,12 @@ export default function Page() {
       <section className="grid gap-10 border-b pb-12 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center md:gap-16 md:pb-16">
         <div>
           <h1 className="max-w-3xl font-heading text-6xl leading-[0.94] tracking-[-0.04em] sm:text-7xl lg:text-8xl">
-            Learn <span className="text-primary">JavaScript</span> at your
-            own pace.
+            Learn <span className="text-primary">JavaScript</span> at your own
+            pace.
           </h1>
-          <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg text-pretty">
-            Short lessons with code you can run, and small coding challenges to lock
-            each one in. Start at the top, or jump to what you need.
+          <p className="mt-7 max-w-xl text-base leading-7 text-pretty text-muted-foreground sm:text-lg">
+            Short lessons with code you can run, and small coding challenges to
+            lock each one in. Start at the top, or jump to what you need.
           </p>
         </div>
         <Link
@@ -71,7 +71,7 @@ export default function Page() {
           {units.map((unit, index) => (
             <section
               key={unit.slug}
-              className="group border-b py-6 sm:border-r sm:px-5 sm:py-7 xl:border-r xl:px-6 sm:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(2n)]:border-r xl:[&:nth-child(3n)]:border-r-0"
+              className="group border-b py-6 sm:border-r sm:px-5 sm:py-7 sm:last:col-span-2 sm:last:border-r-0 xl:border-r xl:px-6 xl:last:col-span-3 xl:last:border-r-0 sm:[&:nth-child(2n)]:border-r-0 xl:[&:nth-child(2n)]:border-r xl:[&:nth-child(3n)]:border-r-0"
             >
               <Link href={unit.items[0]!.href} className="flex h-full flex-col">
                 <div className="mb-8 flex items-center justify-between">

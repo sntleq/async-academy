@@ -5,5 +5,5 @@ export const metadata = {
 };
 
 export default function Page() {
-  redirect("/javascript");
+  redirect("/js");
 }

@@ -158,7 +158,7 @@ console.log(new Array(3, 4));  // two arguments: they become the items
 console.log(Array.of(3));      // always items, so an array holding 3
 `}
           output={`
-[empty × 3]
+[,,,]
 [3, 4]
 [3]
 `}
@@ -215,8 +215,8 @@ undefined
 
         <SubSection title="Unpacking with destructuring">
           <P>
-            Destructuring unpacks items from an array into separate variables
-            in a single declaration, by position.
+            Destructuring unpacks items from an array into separate variables in
+            a single declaration, by position.
           </P>
           <CodeBlock
             title="Array destructuring"
@@ -251,8 +251,8 @@ apple ["banana", "cherry"]
         <P>
           Assign to an index to replace an item. The methods below also change
           the array itself instead of making a new one, which is called
-          mutating. Pay attention to what each one returns, because it is
-          often not the array.
+          mutating. Pay attention to what each one returns, because it is often
+          not the array.
         </P>
         <ComparisonTable
           headers={["Method", "What it does", "Returns"]}
@@ -310,8 +310,8 @@ list = [4, 5];       // TypeError: Assignment to constant variable.
         />
         <Tip>
           Before using a method, know whether it mutates. If you need the
-          original later, copy first or use a method from the quick reference
-          at the end of this lesson.
+          original later, copy first or use a method from the quick reference at
+          the end of this lesson.
         </Tip>
       </Section>
 
@@ -354,10 +354,9 @@ console.log(copy.slice(1, 3));  // slice(start, end) copies a portion; end is no
         <Note>
           The functions passed to <Code>find</Code>, <Code>some</Code>, and{" "}
           <Code>every</Code>, such as{" "}
-          <Code>{"(fruit) => fruit.length > 5"}</Code>, are arrow functions
-          used as callbacks. Read one as a recipe applied to each item: given a
-          fruit, return true or false. The Functions lesson covers them in
-          full.
+          <Code>{"(fruit) => fruit.length > 5"}</Code>, are arrow functions used
+          as callbacks. Read one as a recipe applied to each item: given a
+          fruit, return true or false. The Functions lesson covers them in full.
         </Note>
         <CodeBlock
           title="Finding items and testing them"
@@ -431,9 +430,9 @@ forEach: 2 40
           a new array of the same length, <Code>filter</Code> returns a new
           array of the items that pass, and <Code>reduce</Code> boils the array
           down to one value. It carries a running value through the array,
-          starting from its second argument. At each step the function
-          receives the running value and the current item, and returns the
-          next running value.
+          starting from its second argument. At each step the function receives
+          the running value and the current item, and returns the next running
+          value.
         </P>
         <CodeBlock
           title="map, filter, reduce, and chaining"
@@ -513,10 +512,9 @@ true
         />
         <Note>
           <Code>toSorted</Code>, <Code>toReversed</Code>, and{" "}
-          <Code>toSpliced</Code> are copy-making versions of{" "}
-          <Code>sort</Code>, <Code>reverse</Code>, and <Code>splice</Code>.
-          They are part of ES2023, so they need a recent browser or Node 20 or
-          newer.
+          <Code>toSpliced</Code> are copy-making versions of <Code>sort</Code>,{" "}
+          <Code>reverse</Code>, and <Code>splice</Code>. They are part of
+          ES2023, so they need a recent browser or Node 20 or newer.
         </Note>
       </Section>
 

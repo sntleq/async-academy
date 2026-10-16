@@ -35,10 +35,10 @@ export function SiteHeader() {
           Async Academy<span className="text-primary">.</span>
         </Link>
         <Link
-          href="/javascript"
+          href="/js"
           className={cn(
             "ml-2 flex h-full items-center px-1 text-xs leading-none font-medium whitespace-nowrap transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring sm:ml-4 sm:px-2 sm:text-sm",
-            pathname === "/javascript" && "text-primary"
+            pathname === "/js" && "text-primary"
           )}
         >
           Learn JavaScript

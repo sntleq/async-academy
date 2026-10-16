@@ -192,8 +192,7 @@ undefined
 
         <Warning>
           <Code>
-            new Function(&quot;a&quot;, &quot;b&quot;, &quot;return a +
-            b&quot;)
+            new Function(&quot;a&quot;, &quot;b&quot;, &quot;return a + b&quot;)
           </Code>{" "}
           also creates a function, from a string. It behaves like{" "}
           <Code>eval</Code> and is slow and unsafe, so avoid it.
@@ -354,8 +353,8 @@ undefined
           Functions can be stored in variables, passed to other functions, and
           returned from them. A function that takes or returns another function
           is called a higher-order function, and a function you pass in is
-          called a callback. You already used callbacks with{" "}
-          <Code>map</Code> and <Code>filter</Code> in the Arrays lesson.
+          called a callback. You already used callbacks with <Code>map</Code>{" "}
+          and <Code>filter</Code> in the Arrays lesson.
         </P>
         <CodeBlock
           title="Callbacks and higher-order functions"
@@ -408,9 +407,9 @@ console.log(triple(5));
 `}
         />
         <P>
-          Notice that <Code>double</Code> still knows that{" "}
-          <Code>factor</Code> is 2 long after <Code>makeMultiplier</Code> has
-          finished. That memory is called a closure.
+          Notice that <Code>double</Code> still knows that <Code>factor</Code>{" "}
+          is 2 long after <Code>makeMultiplier</Code> has finished. That memory
+          is called a closure.
         </P>
       </Section>
 

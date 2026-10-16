@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@workspace/ui/lib/utils";
+import { CodePlayground } from "@/components/lesson/code-playground";
+import { isRunnable, type Language } from "@/lib/runner";
 
 const slugify = (text: string) =>
   text
@@ -80,9 +82,20 @@ interface CodeBlockProps {
   code: string;
   title?: string;
   output?: string;
+  language?: Language;
 }
 
-export function CodeBlock({ code, title = "Example", output }: CodeBlockProps) {
+export function CodeBlock({
+  code,
+  title = "Example",
+  output,
+  language = "javascript",
+}: CodeBlockProps) {
+  // Runnable languages get the interactive playground; everything else stays static
+  if (isRunnable(language)) {
+    return <CodePlayground code={code} title={title} output={output} />;
+  }
+
   return (
     <figure className="my-6 overflow-hidden rounded-lg border">
       <figcaption className="border-b bg-muted px-4 py-2 text-sm font-medium">

@@ -68,9 +68,18 @@ const dataTypes = [
 const namingRules = [
   "Names can contain letters, digits, underscores, and dollar signs.",
   "A name cannot start with a digit.",
-  "Names are case sensitive: age and Age are two different variables.",
-  "Reserved words such as class, return, and function cannot be used as names.",
-  "By convention, use camelCase for variables and UPPER_SNAKE_CASE for fixed constants.",
+  <>
+    Names are case sensitive: <Code>age</Code> and <Code>Age</Code> are two
+    different variables.
+  </>,
+  <>
+    Reserved words such as <Code>class</Code>, <Code>return</Code>, and{" "}
+    <Code>function</Code> cannot be used as names.
+  </>,
+  <>
+    By convention, use <Code>camelCase</Code> for variables and{" "}
+    <Code>UPPER_SNAKE_CASE</Code> for fixed constants.
+  </>,
 ];
 
 export default function Page() {

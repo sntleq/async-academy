@@ -73,7 +73,7 @@ export function AppSidebar() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [pathname]);
 
-  if (!pathname.startsWith("/lessons/")) return null;
+  if (!pathname.startsWith("/js/lessons/")) return null;
 
   return (
     <aside className="hidden w-72 shrink-0 border-r lg:block">

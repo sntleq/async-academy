@@ -14,7 +14,7 @@ type LessonSpec = readonly [slug: string, title: string];
 
 // Factory: builds a lesson so nobody ever types an href by hand
 function createLesson(unitSlug: string, [slug, title]: LessonSpec): Lesson {
-  return { title, slug, href: `/lessons/${unitSlug}/${slug}` };
+  return { title, slug, href: `/js/lessons/${unitSlug}/${slug}` };
 }
 
 // Factory: builds a unit and all of its lessons
@@ -34,27 +34,43 @@ const units: Unit[] = [
     ["objects", "Objects"],
     ["functions", "Functions"],
   ]),
-  createUnit("design-patterns", "Design Patterns & jQuery", [
+  createUnit("design-patterns", "Design Patterns", [
     ["factory", "Factory Pattern"],
     ["singleton", "Singleton Pattern"],
-    ["jquery-selectors", "jQuery Selectors"],
+    ["strategy", "Strategy Pattern"],
+    ["module", "Module Pattern"],
+  ]),
+  createUnit("jquery", "jQuery", [
+    ["fundamentals", "Fundamentals"],
+    ["selectors", "Selectors"],
+    ["dom-manipulation", "DOM Manipulation"],
+    ["events", "Event Handling"],
+    ["ajax", "AJAX"],
   ]),
   createUnit("modularization", "Modularization & Frontend", [
-    ["commonjs-amd", "CommonJS & AMD"],
-    ["jquery-events", "jQuery Events & AJAX"],
+    ["commonjs", "CommonJS Module System"],
+    ["amd", "AMD Module System"],
+    ["frontend", "Frontend Design with jQuery"],
   ]),
-  createUnit("backbone", "Backbone.js", [
+  createUnit("backbonejs", "Backbone.js", [
+    ["overview", "Overview & Setup"],
     ["views", "Views"],
-    ["models-collections", "Models & Collections"],
+    ["events", "Events"],
+    ["models", "Models"],
+    ["collections", "Collections"],
     ["routers", "Routers"],
   ]),
   createUnit("nodejs", "Node.js", [
+    ["overview", "Overview & Setup"],
     ["http-module", "HTTP Module"],
     ["file-system", "File System"],
-    ["npm-events", "npm & Events"],
+    ["npm", "npm"],
+    ["events", "Events"],
+    ["uploading-files", "Uploading Files"],
   ]),
   createUnit("deployment", "Deployment", [
     ["client-server", "Client-Server Architecture"],
+    ["intro-to-cloud", "Intro to Cloud Server"],
     ["npm-package", "npm Package Deployment"],
   ]),
 ];

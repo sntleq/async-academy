@@ -8,8 +8,14 @@ function ScrollArea({
   className,
   children,
   autoHide = false,
+  orientation = "vertical",
+  viewportRef,
   ...props
-}: ScrollAreaPrimitive.Root.Props & { autoHide?: boolean }) {
+}: ScrollAreaPrimitive.Root.Props & {
+  autoHide?: boolean;
+  orientation?: "vertical" | "horizontal" | "both";
+  viewportRef?: React.Ref<HTMLDivElement>;
+}) {
   const [isScrolling, setIsScrolling] = React.useState(false);
   const hideTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -33,18 +39,30 @@ function ScrollArea({
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
+        ref={viewportRef}
         data-slot="scroll-area-viewport"
         className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none" // removed focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1
         onScroll={handleScroll}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar
-        className={cn(
-          autoHide && "transition-opacity duration-200",
-          autoHide && !isScrolling && "pointer-events-none opacity-0"
-        )}
-      />
+      {(orientation === "vertical" || orientation === "both") && (
+        <ScrollBar
+          className={cn(
+            autoHide && "transition-opacity duration-200",
+            autoHide && !isScrolling && "pointer-events-none opacity-0"
+          )}
+        />
+      )}
+      {(orientation === "horizontal" || orientation === "both") && (
+        <ScrollBar
+          orientation="horizontal"
+          className={cn(
+            autoHide && "transition-opacity duration-200",
+            autoHide && !isScrolling && "pointer-events-none opacity-0"
+          )}
+        />
+      )}
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   );

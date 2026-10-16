@@ -114,9 +114,9 @@ Account { owner: "Ada" }
 `}
           />
           <Note>
-            You do not need constructors, classes, or{" "}
-            <Code>Object.create</Code> yet. They are here so you recognize them
-            when they show up in other code.
+            You do not need constructors, classes, or <Code>Object.create</Code>{" "}
+            yet. They are here so you recognize them when they show up in other
+            code.
           </Note>
         </SubSection>
       </Section>

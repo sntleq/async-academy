@@ -25,7 +25,7 @@ export default function NotFound() {
         The link may be outdated, or the address may be incorrect.
       </p>
       <Link
-        href="/javascript"
+        href="/js"
         className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
