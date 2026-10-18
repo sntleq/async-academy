@@ -30,7 +30,7 @@ export function SiteHeader() {
         <MobileNavigation />
         <Link
           href="/"
-          className="flex h-full items-center font-heading text-xl leading-none tracking-tight whitespace-nowrap sm:text-2xl"
+          className="flex h-full items-center font-heading text-xl leading-none tracking-tight whitespace-nowrap text-primary sm:text-2xl"
         >
           Async Academy<span className="text-primary">.</span>
         </Link>

@@ -1,10 +1,13 @@
 // lessons/js-basics/arrays/
 
 import { ContentWithToc } from "@/components/layout/content-with-toc";
+import Link from "next/link";
+import { buttonVariants } from "@workspace/ui/components/button";
 import {
   Code,
   CodeBlock,
   ComparisonTable,
+  LessonLink,
   LessonTitle,
   Note,
   P,
@@ -345,8 +348,9 @@ console.log(copy.slice(1, 3));  // slice(start, end) copies a portion; end is no
         />
         <Note>
           These copies are shallow. If the array holds objects or other arrays,
-          the copy holds the same ones. The Objects lesson shows how to make a
-          deep copy.
+          the copy holds the same ones. The{" "}
+          <LessonLink href="/js/lessons/js-basics/objects">Objects</LessonLink>{" "}
+          lesson shows how to make a deep copy.
         </Note>
       </Section>
 
@@ -356,7 +360,9 @@ console.log(copy.slice(1, 3));  // slice(start, end) copies a portion; end is no
           <Code>every</Code>, such as{" "}
           <Code>{"(fruit) => fruit.length > 5"}</Code>, are arrow functions used
           as callbacks. Read one as a recipe applied to each item: given a
-          fruit, return true or false. The Functions lesson covers them in full.
+          fruit, return true or false. The{" "}
+          <LessonLink href="/js/lessons/js-basics/functions">Functions</LessonLink>{" "}
+          lesson covers them in full.
         </Note>
         <CodeBlock
           title="Finding items and testing them"
@@ -532,6 +538,28 @@ true
           ])}
         />
       </Section>
+
+      <section className="mt-24 border-t pt-10">
+        <h2
+          id="ready-for-the-quiz"
+          data-toc-space="true"
+          data-toc-active-at-bottom="true"
+          className="mb-4 scroll-mt-24 font-heading text-3xl leading-tight tracking-tight sm:text-4xl"
+        >
+          Ready for the quiz?
+        </h2>
+        <P>
+          Put this lesson into practice with a short quiz of coding exercises and
+          quick knowledge checks. The lesson is only marked as done once you
+          complete the quiz.
+        </P>
+        <Link
+          href="/js/lessons/js-basics/arrays/quiz"
+          className={buttonVariants({ size: "lg" })}
+        >
+          Start the quiz
+        </Link>
+      </section>
     </ContentWithToc>
   );
 }

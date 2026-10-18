@@ -1,9 +1,12 @@
 // lessons/js-basics/objects/
 
 import { ContentWithToc } from "@/components/layout/content-with-toc";
+import Link from "next/link";
+import { buttonVariants } from "@workspace/ui/components/button";
 import {
   Code,
   CodeBlock,
+  LessonLink,
   LessonTitle,
   Note,
   P,
@@ -72,7 +75,11 @@ false
         />
         <Tip>
           Factory functions are a design pattern of their own. You will build
-          more with them in the Design Patterns unit.
+          more with them in the{" "}
+          <LessonLink href="/js/lessons/design-patterns/factory">
+            Factory Pattern
+          </LessonLink>{" "}
+          lesson.
         </Tip>
 
         <SubSection title="Other ways you will see">
@@ -380,8 +387,11 @@ true
       <Section title="Arrays of objects">
         <P>
           The most common data shape in JavaScript is an array of objects.
-          Combine the array methods from the previous lesson with destructuring
-          in the callback parameters to work with it. In{" "}
+          Combine the array methods from{" "}
+          <LessonLink href="/js/lessons/js-basics/arrays">
+            Arrays
+          </LessonLink>{" "}
+          lesson with destructuring in the callback parameters to work with it. In{" "}
           <Code>{"({ title }) => title"}</Code>, the braces pull the{" "}
           <Code>title</Code> property out of each object.
         </P>
@@ -437,6 +447,28 @@ console.log(lessons[1]);   // the original is untouched
           <Code>map</Code>.
         </Tip>
       </Section>
+
+      <section className="mt-24 border-t pt-10">
+        <h2
+          id="ready-for-the-quiz"
+          data-toc-space="true"
+          data-toc-active-at-bottom="true"
+          className="mb-4 scroll-mt-24 font-heading text-3xl leading-tight tracking-tight sm:text-4xl"
+        >
+          Ready for the quiz?
+        </h2>
+        <P>
+          Put this lesson into practice with a short quiz of coding exercises and
+          quick knowledge checks. The lesson is only marked as done once you
+          complete the quiz.
+        </P>
+        <Link
+          href="/js/lessons/js-basics/objects/quiz"
+          className={buttonVariants({ size: "lg" })}
+        >
+          Start the quiz
+        </Link>
+      </section>
     </ContentWithToc>
   );
 }

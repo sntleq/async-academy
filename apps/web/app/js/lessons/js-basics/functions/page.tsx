@@ -1,10 +1,13 @@
 // lessons/js-basics/functions/
 
 import { ContentWithToc } from "@/components/layout/content-with-toc";
+import Link from "next/link";
+import { buttonVariants } from "@workspace/ui/components/button";
 import {
   Code,
   CodeBlock,
   ComparisonTable,
+  LessonLink,
   LessonTitle,
   Note,
   P,
@@ -354,7 +357,9 @@ undefined
           returned from them. A function that takes or returns another function
           is called a higher-order function, and a function you pass in is
           called a callback. You already used callbacks with <Code>map</Code>{" "}
-          and <Code>filter</Code> in the Arrays lesson.
+          and <Code>filter</Code> in the{" "}
+          <LessonLink href="/js/lessons/js-basics/arrays">Arrays</LessonLink>{" "}
+          lesson.
         </P>
         <CodeBlock
           title="Callbacks and higher-order functions"
@@ -385,8 +390,10 @@ console.log(operations[chosen](10, 4));
         />
         <Tip>
           Picking behavior from an object of functions at runtime is the idea
-          behind the Strategy pattern, which you will meet in the Design
-          Patterns unit.
+          behind the{" "}
+          <LessonLink href="/js/lessons/design-patterns/strategy">
+            Strategy Pattern
+          </LessonLink>, covered later.
         </Tip>
         <CodeBlock
           title="Returning a function"
@@ -570,6 +577,28 @@ console.log(sumAll([1, [2, [3, 4]], 5]));
           output={`15`}
         />
       </Section>
+
+      <section className="mt-24 border-t pt-10">
+        <h2
+          id="ready-for-the-quiz"
+          data-toc-space="true"
+          data-toc-active-at-bottom="true"
+          className="mb-4 scroll-mt-24 font-heading text-3xl leading-tight tracking-tight sm:text-4xl"
+        >
+          Ready for the quiz?
+        </h2>
+        <P>
+          Put this lesson into practice with a short quiz of coding exercises and
+          quick knowledge checks. The lesson is only marked as done once you
+          complete the quiz.
+        </P>
+        <Link
+          href="/js/lessons/js-basics/functions/quiz"
+          className={buttonVariants({ size: "lg" })}
+        >
+          Start the quiz
+        </Link>
+      </section>
     </ContentWithToc>
   );
 }

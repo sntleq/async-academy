@@ -7,6 +7,8 @@ interface Heading {
   id: string;
   text: string;
   level: number;
+  href: string;
+  spaced: boolean;
 }
 
 export function TableOfContents({ containerId }: { containerId: string }) {
@@ -23,12 +25,17 @@ export function TableOfContents({ containerId }: { containerId: string }) {
     const scrollRoot = container.closest<HTMLElement>(
       '[data-slot="scroll-area-viewport"]'
     );
+    const bottomHeading = elements.find(
+      (el) => el.dataset.tocActiveAtBottom === "true"
+    );
 
     setHeadings(
       elements.map((el) => ({
         id: el.id,
-        text: el.textContent ?? "",
+        text: el.dataset.tocLabel ?? el.textContent ?? "",
         level: el.tagName === "H2" ? 2 : 3,
+        href: el.dataset.tocHref ?? `#${el.id}`,
+        spaced: Boolean(el.dataset.tocSpace),
       }))
     );
 
@@ -41,7 +48,29 @@ export function TableOfContents({ containerId }: { containerId: string }) {
     );
 
     elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+
+    function updateBottomHeading() {
+      if (!bottomHeading) return;
+
+      const isAtBottom = scrollRoot
+        ? scrollRoot.scrollTop + scrollRoot.clientHeight >=
+          scrollRoot.scrollHeight - 48
+        : window.scrollY + window.innerHeight >=
+          document.documentElement.scrollHeight - 48;
+
+      if (isAtBottom) setActiveId(bottomHeading.id);
+    }
+
+    const scrollTarget = scrollRoot ?? window;
+    scrollTarget.addEventListener("scroll", updateBottomHeading, {
+      passive: true,
+    });
+    updateBottomHeading();
+
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener("scroll", updateBottomHeading);
+    };
   }, [containerId]);
 
   if (headings.length === 0) return null;
@@ -52,11 +81,12 @@ export function TableOfContents({ containerId }: { containerId: string }) {
       {headings.map((heading) => (
         <a
           key={heading.id}
-          href={`#${heading.id}`}
+          href={heading.href}
           onClick={() => setActiveId(heading.id)}
           className={cn(
             "text-muted-foreground transition-colors hover:text-primary",
             heading.level === 3 && "pl-4",
+            heading.spaced && "mt-2",
             activeId === heading.id && "font-medium text-primary"
           )}
         >

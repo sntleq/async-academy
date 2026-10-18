@@ -1,12 +1,17 @@
 // Source of the Web Worker that runs learner code. It is a string so it can be
 // turned into a Blob URL at runtime (no extra bundler config needed).
 //
-// Module pattern: everything lives inside an IIFE. Only `run` is exposed;
-// `pending`, `inspect`, `emit` and friends stay private.
+// Module pattern: everything lives inside an IIFE. Only `run` and `runModule`
+// are exposed; `pending`, `inspect`, `emit` and friends stay private.
+//
+// Two ways in, same worker source:
+//   run(code)            one script, evaluated as plain code (classic worker)
+//   runModule(url, ...)  a graph of ES modules, started with import() (module worker)
 export const WORKER_SOURCE = `
 var Sandbox = (function () {
   var pending = 0;
   var nativeSetTimeout = self.setTimeout.bind(self);
+  var fileNames = {};
 
   function inspect(value, depth, seen) {
     if (typeof value === "string") return depth === 0 ? value : "'" + value + "'";
@@ -66,6 +71,12 @@ var Sandbox = (function () {
     var text = error instanceof Error
       ? error.name + ": " + error.message
       : "Uncaught " + inspect(error, 0, new WeakSet());
+
+    // Module errors mention blob: URLs. Show the file names instead.
+    Object.keys(fileNames).forEach(function (url) {
+      text = text.split(url).join(fileNames[url]);
+    });
+
     emit("error", text);
   }
 
@@ -112,9 +123,23 @@ var Sandbox = (function () {
         report(error);
       }
       checkDone();
+    },
+
+    // entryUrl is a blob: URL whose imports were already rewritten to other
+    // blob: URLs, so the browser loads the whole graph by itself.
+    runModule: function (entryUrl, names) {
+      fileNames = names || {};
+      import(entryUrl).then(
+        function () { checkDone(); },
+        function (error) { report(error); checkDone(); }
+      );
     }
   };
 })();
 
-self.onmessage = function (event) { Sandbox.run(event.data); };
+self.onmessage = function (event) {
+  var data = event.data;
+  if (typeof data === "string") Sandbox.run(data);
+  else Sandbox.runModule(data.entry, data.names);
+};
 `;

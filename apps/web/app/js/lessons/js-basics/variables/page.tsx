@@ -1,10 +1,13 @@
 // lessons/js-basics/variables/
 
 import { ContentWithToc } from "@/components/layout/content-with-toc";
+import Link from "next/link";
+import { buttonVariants } from "@workspace/ui/components/button";
 import {
   Code,
   CodeBlock,
   ComparisonTable,
+  LessonLink,
   LessonTitle,
   List,
   P,
@@ -255,6 +258,13 @@ object
             any expression with a dollar sign and curly braces and can span
             several lines.
           </P>
+          <Tip>
+            A dollar sign is plain text unless it starts an interpolation. In{" "}
+            <Code>{"`Total: $${total}`"}</Code>, the first <Code>$</Code> is
+            printed and <Code>{"${total}"}</Code> inserts the value. To include
+            the literal characters <Code>{"${"}</Code>, escape the dollar sign
+            as <Code>{"\\${"}</Code>.
+          </Tip>
           <CodeBlock
             title="Quotes and template literals"
             code={`
@@ -314,8 +324,9 @@ console.log(message);   // ReferenceError: message is not defined
           <Code>var</Code> starts as <Code>undefined</Code>. A <Code>let</Code>{" "}
           or <Code>const</Code> exists but cannot be touched until its
           declaration line runs. That gap is called the temporal dead zone.
-          Function declarations are hoisted too, which the Functions lesson
-          covers.
+          Function declarations are hoisted too, which the{" "}
+          <LessonLink href="/js/lessons/js-basics/functions">Functions</LessonLink>{" "}
+          lesson covers.
         </P>
         <CodeBlock
           title="Hoisting in action"
@@ -328,6 +339,28 @@ let b = 2;
 `}
         />
       </Section>
+
+      <section className="mt-24 border-t pt-10">
+        <h2
+          id="ready-for-the-quiz"
+          data-toc-space="true"
+          data-toc-active-at-bottom="true"
+          className="mb-4 scroll-mt-24 font-heading text-3xl leading-tight tracking-tight sm:text-4xl"
+        >
+          Ready for the quiz?
+        </h2>
+        <P>
+          Put this lesson into practice with a short quiz of coding exercises and
+          quick knowledge checks. The lesson is only marked as done once you
+          complete the quiz.
+        </P>
+        <Link
+          href="/js/lessons/js-basics/variables/quiz"
+          className={buttonVariants({ size: "lg" })}
+        >
+          Start the quiz
+        </Link>
+      </section>
     </ContentWithToc>
   );
 }

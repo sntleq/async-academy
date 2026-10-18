@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { cn } from "@workspace/ui/lib/utils";
 import { CodePlayground } from "@/components/lesson/code-playground";
-import { isRunnable, type Language } from "@/lib/runner";
+import { isRunnable, type Files, type Language } from "@/lib/runner";
 
 const slugify = (text: string) =>
   text
@@ -17,10 +18,27 @@ export function LessonTitle({ children }: { children: ReactNode }) {
   );
 }
 
-export function P({
+export function LessonLink({
+  href,
   children,
-  className,
 }: {
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="font-heading text-[1.3em] text-primary underline decoration-1 decoration-primary underline-offset-1 transition-colors focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      {children}
+    </Link>
+  );
+}
+
+export function P({
+                    children,
+                    className,
+                  }: {
   children: ReactNode;
   className?: string;
 }) {
@@ -35,10 +53,10 @@ interface SectionProps {
 
 // The table of contents reads h2/h3 elements that have an id, so the id defaults to a slug of the title
 export function Section({
-  title,
-  id = slugify(title),
-  children,
-}: SectionProps) {
+                          title,
+                          id = slugify(title),
+                          children,
+                        }: SectionProps) {
   return (
     <section className="mt-12">
       <h2
@@ -53,10 +71,10 @@ export function Section({
 }
 
 export function SubSection({
-  title,
-  id = slugify(title),
-  children,
-}: SectionProps) {
+                             title,
+                             id = slugify(title),
+                             children,
+                           }: SectionProps) {
   return (
     <div className="mt-8">
       <h3
@@ -72,25 +90,52 @@ export function SubSection({
 
 export function Code({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.9em] text-primary">
+    <code className="inline align-baseline rounded bg-muted px-1.5 font-mono text-[0.9em] leading-none text-primary [vertical-align:baseline]">
       {children}
     </code>
   );
 }
 
-interface CodeBlockProps {
-  code: string;
+interface BaseCodeBlockProps {
   title?: string;
   output?: string;
-  language?: Language;
 }
 
-export function CodeBlock({
-  code,
-  title = "Example",
-  output,
-  language = "javascript",
-}: CodeBlockProps) {
+// One script
+interface SingleFileProps extends BaseCodeBlockProps {
+  code: string;
+  language?: Language;
+  files?: undefined;
+  entry?: undefined;
+}
+
+// Several files that import each other. `entry` defaults to the first file.
+interface MultiFileProps extends BaseCodeBlockProps {
+  files: Files;
+  entry?: string;
+  code?: undefined;
+  language?: undefined;
+}
+
+type CodeBlockProps = SingleFileProps | MultiFileProps;
+
+export function CodeBlock(props: CodeBlockProps) {
+  const { title = "Example", output } = props;
+
+  // Multi-file blocks are always JavaScript modules, so they are always runnable
+  if (props.files) {
+    return (
+      <CodePlayground
+        files={props.files}
+        entry={props.entry}
+        title={title}
+        output={output}
+      />
+    );
+  }
+
+  const { code, language = "javascript" } = props;
+
   // Runnable languages get the interactive playground; everything else stays static
   if (isRunnable(language)) {
     return <CodePlayground code={code} title={title} output={output} />;
@@ -136,24 +181,24 @@ export function ComparisonTable({ headers, rows }: ComparisonTableProps) {
     <div className="my-6 overflow-x-auto rounded-lg border">
       <table className="w-full text-left text-sm">
         <thead className="bg-muted">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-4 py-2 font-medium">
-                {header}
-              </th>
-            ))}
-          </tr>
+        <tr>
+          {headers.map((header) => (
+            <th key={header} className="px-4 py-2 font-medium">
+              {header}
+            </th>
+          ))}
+        </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-t">
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-4 py-2 align-top">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+        {rows.map((row, rowIndex) => (
+          <tr key={rowIndex} className="border-t">
+            {row.map((cell, cellIndex) => (
+              <td key={cellIndex} className="px-4 py-2 align-top">
+                {cell}
+              </td>
+            ))}
+          </tr>
+        ))}
         </tbody>
       </table>
     </div>

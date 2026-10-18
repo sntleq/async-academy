@@ -46,11 +46,11 @@ const units: Unit[] = [
     ["dom-manipulation", "DOM Manipulation"],
     ["events", "Event Handling"],
     ["ajax", "AJAX"],
+    ["frontend", "Frontend Design"],
   ]),
-  createUnit("modularization", "Modularization & Frontend", [
-    ["commonjs", "CommonJS Module System"],
-    ["amd", "AMD Module System"],
-    ["frontend", "Frontend Design with jQuery"],
+  createUnit("modularization", "Modularization", [
+    ["commonjs", "CommonJS"],
+    ["amd", "AMD"],
   ]),
   createUnit("backbonejs", "Backbone.js", [
     ["overview", "Overview & Setup"],
@@ -96,6 +96,11 @@ export class Curriculum {
 
   getUnits(): Unit[] {
     return this.units;
+  }
+
+  getLesson(unitSlug: string, lessonSlug: string): Lesson | null {
+    const unit = this.units.find((item) => item.slug === unitSlug);
+    return unit?.items.find((lesson) => lesson.slug === lessonSlug) ?? null;
   }
 
   getAdjacent(href: string): { prev: Lesson | null; next: Lesson | null } {

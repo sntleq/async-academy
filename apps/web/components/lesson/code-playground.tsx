@@ -11,16 +11,20 @@ import { Play } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { getRunner, type LogLevel, type OutputLine } from "@/lib/runner";
+import {
+  getRunner,
+  type Files,
+  type LogLevel,
+  type OutputLine,
+} from "@/lib/runner";
 import { HighlightedCode } from "@/components/lesson/highlighted-code";
+import { tokenizeJs } from "@/lib/highlight/tokenize-js";
 
 const MAX_LINES = 500;
 const EDITOR_LINE_HEIGHT = 24;
 const EDITOR_VERTICAL_PADDING = 32;
+const EDITOR_HORIZONTAL_GUTTER = 32;
 const EDITOR_MAX_HEIGHT = 384;
-const OUTPUT_LINE_HEIGHT = 24;
-const OUTPUT_VERTICAL_PADDING = 10;
-const OUTPUT_MAX_HEIGHT = 160;
 
 // Shared by the highlight layer, the textarea and the line numbers so they line up exactly
 const editorText = "font-mono text-sm leading-6";
@@ -199,25 +203,363 @@ const levelClasses: Record<LogLevel, string> = {
   error: "text-destructive",
 };
 
+// A single script has no real file name, so it gets a placeholder that is never shown
+const SCRIPT = "script.js";
+const CHALLENGE_RESULT_PREFIX = "__ASYNC_ACADEMY_CHALLENGE_RESULT__";
+
+export interface ChallengeTestCase {
+  args: unknown[];
+  expected: unknown;
+  hidden?: boolean;
+}
+
+// The variable the solution has to return, instead of returning an expression directly.
+// Checked on the source code, because a variable inside a function can't be seen from
+// outside it, so no test can read it.
+export interface ReturnVariable {
+  name: string;
+  // Omit to accept const, let or var
+  keyword?: "const" | "let" | "var";
+}
+
+export interface PlaygroundChallenge {
+  functionName: string;
+  testCases: ChallengeTestCase[];
+  returnVariable?: ReturnVariable;
+}
+
+// What the harness reports for each test case
+interface CaseResult {
+  passed: boolean;
+  // The returned value, formatted for display ("" when the function threw)
+  actual: string;
+  // "TypeError: ..." when the function threw
+  error: string | null;
+  // console output produced while this case ran
+  logs: string[];
+}
+
+function isCaseResults(value: unknown): value is CaseResult[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.passed === "boolean" &&
+        typeof item.actual === "string" &&
+        (item.error === null || typeof item.error === "string") &&
+        Array.isArray(item.logs) &&
+        item.logs.every((log: unknown) => typeof log === "string")
+    )
+  );
+}
+
+// Runs inside the worker, right after the learner's code. It sees the learner's
+// functions as globals and reports one result per test case.
+function createChallengeHarness({ functionName, testCases }: PlaygroundChallenge) {
+  return `
+;(() => {
+  const cases = ${JSON.stringify(testCases)};
+  const name = ${JSON.stringify(functionName)};
+  const candidate = globalThis[name];
+  const levels = ["log", "info", "warn", "error"];
+
+  const show = (value) => {
+    if (typeof value === "string") return JSON.stringify(value);
+    if (typeof value === "undefined") return "undefined";
+    if (typeof value === "bigint") return value + "n";
+    if (typeof value === "function") return "[Function]";
+    if (value !== null && typeof value === "object") {
+      try { return JSON.stringify(value); } catch { return String(value); }
+    }
+    return Object.is(value, -0) ? "-0" : String(value);
+  };
+
+  // Arrays and objects are compared by content, because two separate arrays
+  // are never === even when they hold the same items
+  const same = (a, b) => {
+    if (Object.is(a, b)) return true;
+    if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    return (
+      keysA.length === keysB.length &&
+      keysA.every((key) => Object.prototype.hasOwnProperty.call(b, key) && same(a[key], b[key]))
+    );
+  };
+
+  const results = cases.map(({ args, expected }) => {
+    // Collect console output per case, so one case's logs never end up in another's
+    const logs = [];
+    const original = {};
+    levels.forEach((level) => {
+      original[level] = console[level];
+      console[level] = (...parts) =>
+        logs.push(parts.map((part) => (typeof part === "string" ? part : show(part))).join(" "));
+    });
+
+    try {
+      if (typeof candidate !== "function") {
+        return { passed: false, actual: "", error: name + " is not a function", logs };
+      }
+      const actual = candidate(...args);
+      return { passed: same(actual, expected), actual: show(actual), error: null, logs };
+    } catch (error) {
+      const text = error instanceof Error ? error.name + ": " + error.message : "Uncaught " + show(error);
+      return { passed: false, actual: "", error: text, logs };
+    } finally {
+      levels.forEach((level) => { console[level] = original[level]; });
+    }
+  });
+
+  console.log(${JSON.stringify(CHALLENGE_RESULT_PREFIX)} + JSON.stringify(results));
+})();
+`;
+}
+
+export function formatValue(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "undefined") return "undefined";
+  if (typeof value === "bigint") return `${value}n`;
+  if (typeof value === "object" && value !== null) {
+    const serialized = JSON.stringify(value);
+    return serialized ? formatPreviewLine(serialized) : String(value);
+  }
+  return Object.is(value, -0) ? "-0" : String(value);
+}
+
+function formatExpectedValue(value: unknown): string {
+  return typeof value === "string" ? value : formatValue(value);
+}
+
+function formatHarnessOutput(value: string) {
+  // The worker JSON-encodes string return values; lesson output shows those raw.
+  if (value.startsWith('"') && value.endsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (typeof parsed === "string") return formatPreviewLine(parsed);
+    } catch {
+      // Leave non-JSON output unchanged and let the shared formatter handle it.
+    }
+  }
+
+  return formatPreviewLine(value);
+}
+
+export function describeReturnVariable({ name, keyword }: ReturnVariable) {
+  return `Store the result in a ${keyword ?? "variable"} named ${name} and return it`;
+}
+
+// True when the code declares the variable ("const name") AND returns it by name
+// ("return name;"), so returning an expression directly doesn't count. It reads tokens,
+// not raw text, so a declaration or return inside a comment or a string is ignored.
+function returnsVariable(source: string, { name, keyword }: ReturnVariable) {
+  const tokens = tokenizeJs(source).filter(
+    (token) =>
+      token.type !== "comment" &&
+      !(token.type === "plain" && token.text.trim() === "")
+  );
+  const keywords = keyword ? [keyword] : ["const", "let", "var"];
+
+  const declared = tokens.some(
+    (token, index) =>
+      token.type === "keyword" &&
+      keywords.includes(token.text) &&
+      tokens[index + 1]?.text === name
+  );
+  // "return total" must end the statement, so "return total + 1" is not accepted
+  const returned = tokens.some(
+    (token, index) =>
+      token.type === "keyword" &&
+      token.text === "return" &&
+      tokens[index + 1]?.text === name &&
+      [undefined, ";", "}"].includes(tokens[index + 2]?.text)
+  );
+
+  return declared && returned;
+}
+
+// Which part of the challenge the output panel is showing
+type ChallengeView =
+  | { kind: "summary" }
+  | {
+  kind: "case";
+  index: number;
+  total: number;
+  input: string;
+  expected: string;
+  output: string;
+  outputIsError: boolean;
+  logs: string[];
+  requirementError: string | null;
+}
+  | null;
+
+// Show the first failed case, or the first case if only the source requirement fails.
+// Show a summary only after every test and source requirement passes.
+function buildChallengeReport(
+  challenge: PlaygroundChallenge,
+  source: string,
+  results: CaseResult[] | null
+): { lines: OutputLine[]; view: ChallengeView; passed: boolean } {
+  const total = challenge.testCases.length;
+
+  if (results === null || results.length !== total) {
+    return {
+      lines: [
+        {
+          level: "warn",
+          text: "Tests could not finish. Check your code and try again.",
+        },
+      ],
+      view: null,
+      passed: false,
+    };
+  }
+
+  const lines: OutputLine[] = [];
+  const failedIndex = results.findIndex((result) => !result.passed);
+  const requirementMet =
+    !challenge.returnVariable || returnsVariable(source, challenge.returnVariable);
+
+  if (failedIndex === -1 && requirementMet) {
+    const view: ChallengeView = { kind: "summary" };
+    lines.push({ level: "info", text: `Passed ${total} of ${total} test cases.` });
+    return { lines, view, passed: true };
+  }
+
+  // If every test passed but the source requirement did not, show the first case
+  // again so its output card can carry the requirement feedback.
+  const index = failedIndex === -1 ? 0 : failedIndex;
+  const testCase = challenge.testCases[index]!;
+  const result = results[index]!;
+  const requirementError =
+    !requirementMet && challenge.returnVariable
+      ? `Requirement not met: ${describeReturnVariable(challenge.returnVariable)}.`
+      : null;
+
+  const view: ChallengeView = {
+    kind: "case",
+    index,
+    total,
+    input: `${challenge.functionName}(${testCase.args
+      .map(formatValue)
+      .join(", ")})`,
+    expected: formatExpectedValue(testCase.expected),
+    output: result.error
+      ? result.error
+      : formatHarnessOutput(result.actual),
+    outputIsError:
+      !result.passed ||
+      result.error !== null ||
+      requirementError !== null,
+    logs: result.logs.map(formatPreviewLine),
+    requirementError,
+  };
+
+  return { lines, view, passed: false };
+}
+
+function ResultValueCard({
+                           label,
+                           value,
+                           error = false,
+                           requirementError,
+                           logs = [],
+                         }: {
+  label: string;
+  value: string;
+  error?: boolean;
+  requirementError?: string | null;
+  logs?: string[];
+}) {
+  return (
+    <div className="w-full min-w-0 rounded-md border bg-background px-3 py-2">
+      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <pre
+        className={cn(
+          editorText,
+          "m-0 max-h-40 w-full overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere]",
+          error && "text-destructive"
+        )}
+      >
+        {value}
+      </pre>
+      {requirementError && (
+        <p className="mt-2 border-t pt-2 text-xs leading-5 text-destructive">
+          {requirementError}
+        </p>
+      )}
+      {logs.length > 0 && (
+        <div className="mt-2 border-t pt-2">
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Console Output
+          </p>
+          <pre
+            className={cn(
+              editorText,
+              "m-0 max-h-40 w-full overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere]"
+            )}
+          >
+            {logs.join("\n")}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface CodePlaygroundProps {
-  code: string;
+  // One script...
+  code?: string;
+  // ...or several files that import each other. `entry` is the one that runs
+  // (the first file when omitted).
+  files?: Files;
+  entry?: string;
   title?: string;
   // Shown before the first run so the page isn't empty; replaced by real output.
   output?: string;
+  challenge?: PlaygroundChallenge;
+  onChallengeResult?: (passed: boolean | null) => void;
 }
 
 export function CodePlayground({
-  code,
-  title = "Example",
-  output,
-}: CodePlaygroundProps) {
-  const original = code.trim();
-  const [source, setSource] = useState(original);
+                                 code = "",
+                                 files,
+                                 entry,
+                                 title = "Example",
+                                 output,
+                                 challenge,
+                                 onChallengeResult,
+                               }: CodePlaygroundProps) {
+  const isMulti = files !== undefined;
+  const original: Files = files
+    ? Object.fromEntries(
+      Object.entries(files).map(([name, text]) => [name, text.trim()])
+    )
+    : { [SCRIPT]: code.trim() };
+  const names = Object.keys(original);
+  const entryName = entry && entry in original ? entry : names[0]!;
+
+  const [sources, setSources] = useState<Files>(original);
+  const [activeName, setActiveName] = useState(entryName);
+  // The editor below always shows one file; these two stand in for "the" source
+  const source = sources[activeName] ?? "";
+  const setSource = (value: string) => {
+    setSources((prev) => ({ ...prev, [activeName]: value }));
+    onChallengeResult?.(null);
+  };
   const [lines, setLines] = useState<OutputLine[] | null>(null);
+  const [challengeView, setChallengeView] = useState<ChallengeView>(null);
   const [running, setRunning] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorViewportRef = useRef<HTMLDivElement>(null);
+  const measureContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const pendingSelection = useRef<[number, number] | null>(null);
   const releaseTab = useRef(false);
 
@@ -230,6 +572,40 @@ export function CodePlayground({
         textarea.selectionDirection === "backward"
           ? textarea.selectionStart
           : textarea.selectionEnd;
+      const lineStart = textarea.value.lastIndexOf("\n", caretIndex - 1) + 1;
+      const caretText = textarea.value.slice(lineStart, caretIndex);
+      const textStyle = getComputedStyle(textarea);
+      measureContextRef.current ??= document
+        .createElement("canvas")
+        .getContext("2d");
+      if (measureContextRef.current) {
+        measureContextRef.current.font = textStyle.font;
+      }
+      const caretTextWidth = measureContextRef.current
+        ? measureContextRef.current.measureText(caretText).width
+        : caretText.length * (Number.parseFloat(textStyle.fontSize) || 14) * 0.6;
+      const textareaRect = textarea.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const caretRight =
+        textareaRect.left -
+        viewportRect.left +
+        viewport.scrollLeft +
+        (Number.parseFloat(textStyle.paddingLeft) || 0) +
+        caretTextWidth;
+      const visibleRight = viewport.scrollLeft + viewport.clientWidth;
+
+      if (caretRight + EDITOR_HORIZONTAL_GUTTER > visibleRight) {
+        viewport.scrollLeft = Math.max(
+          0,
+          caretRight + EDITOR_HORIZONTAL_GUTTER - viewport.clientWidth
+        );
+      } else if (caretRight < viewport.scrollLeft + EDITOR_HORIZONTAL_GUTTER) {
+        viewport.scrollLeft = Math.max(
+          0,
+          caretRight - EDITOR_HORIZONTAL_GUTTER
+        );
+      }
+
       const lineIndex =
         textarea.value.slice(0, caretIndex).split("\n").length - 1;
       const caretTop =
@@ -288,20 +664,25 @@ export function CodePlayground({
 
   const preview: OutputLine[] | null = output
     ? output
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map(
-          (text): OutputLine => ({
-            level: /^\w*Error:/.test(text) ? "error" : "log",
-            text: formatPreviewLine(text),
-          })
-        )
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map(
+        (text): OutputLine => ({
+          level: /^\w*Error:/.test(text) ? "error" : "log",
+          text: formatPreviewLine(text),
+        })
+      )
     : null;
   const shown = lines ?? preview;
   const isPreview = lines === null && preview !== null;
-  const edited = source !== original;
+  const edited = names.some((name) => sources[name] !== original[name]);
   const lineCount = source.split("\n").length;
+  // Size the editor for the longest file so switching tabs doesn't make the page jump
+  const editorLines = Math.max(
+    ...names.map((name) => (sources[name] ?? "").split("\n").length)
+  );
+  const editorHeight = editorLines * EDITOR_LINE_HEIGHT + EDITOR_VERTICAL_PADDING;
 
   async function run() {
     const runner = getRunner("javascript");
@@ -309,18 +690,65 @@ export function CodePlayground({
 
     setRunning(true);
     setLines([]);
-    await runner.run(source, (line) =>
+    setChallengeView(null);
+
+    const challengeResults: { value: CaseResult[] | null } = { value: null };
+    const onLine = (line: OutputLine) => {
+      if (
+        challenge &&
+        line.level === "log" &&
+        line.text.startsWith(CHALLENGE_RESULT_PREFIX)
+      ) {
+        try {
+          const parsed: unknown = JSON.parse(
+            line.text.slice(CHALLENGE_RESULT_PREFIX.length)
+          );
+          challengeResults.value = isCaseResults(parsed) ? parsed : null;
+        } catch {
+          challengeResults.value = null;
+        }
+        return;
+      }
+
       setLines((prev) => {
         const current = prev ?? [];
         return current.length >= MAX_LINES ? current : [...current, line];
-      })
-    );
+      });
+    };
+
+    if (isMulti) {
+      await runner.runFiles(sources, entryName, onLine);
+    } else {
+      const runnableSource = challenge
+        ? `${source}\n${createChallengeHarness(challenge)}`
+        : source;
+      await runner.run(runnableSource, onLine);
+    }
+
+    if (challenge) {
+      const report = buildChallengeReport(
+        challenge,
+        source,
+        challengeResults.value
+      );
+      setLines((prev) => [...(prev ?? []), ...report.lines]);
+      setChallengeView(report.view);
+      onChallengeResult?.(report.passed);
+    }
+
     setRunning(false);
   }
 
   function reset() {
-    setSource(original);
+    setSources(original);
     setLines(null);
+    setChallengeView(null);
+    onChallengeResult?.(null);
+  }
+
+  function switchTab(name: string) {
+    setActiveName(name);
+    if (editorViewportRef.current) editorViewportRef.current.scrollTop = 0;
   }
 
   const PAIRS: Record<string, string> = {
@@ -465,19 +893,44 @@ export function CodePlayground({
         <span className="font-mono text-xs text-muted-foreground">JS</span>
       </figcaption>
 
+      {isMulti && (
+        <div
+          role="group"
+          aria-label={`${title} files`}
+          className="flex overflow-x-auto border-b bg-muted/30"
+        >
+          {names.map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={name === activeName}
+              onClick={() => switchTab(name)}
+              className={cn(
+                "shrink-0 border-r px-4 py-2 font-mono text-xs transition-colors",
+                name === activeName
+                  ? "bg-background text-foreground"
+                  : "text-muted-foreground hover:text-primary"
+              )}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <ScrollArea
         autoHide
         orientation="both"
         viewportRef={editorViewportRef}
         className="max-h-[min(24rem,60dvh)] w-full"
-        style={{
-          height: Math.min(
-            lineCount * EDITOR_LINE_HEIGHT + EDITOR_VERTICAL_PADDING,
-            EDITOR_MAX_HEIGHT
-          ),
-        }}
+        style={{ height: Math.min(editorHeight, EDITOR_MAX_HEIGHT) }}
       >
-        <div className="flex w-max min-w-full bg-background focus-within:ring-1 focus-within:ring-ring/50 focus-within:ring-inset">
+        {/* min-height makes a shorter file fill the editor, so the gutter, the focus ring
+            and the clickable area cover the whole box instead of stopping after the last line */}
+        <div
+          className="flex w-max min-w-full bg-background focus-within:ring-1 focus-within:ring-ring/50 focus-within:ring-inset"
+          style={{ minHeight: editorHeight }}
+        >
           {/* Keep the gutter in the same scroll viewport as the code. */}
           <pre
             aria-hidden
@@ -490,12 +943,12 @@ export function CodePlayground({
           </pre>
 
           {/* Highlight layer and textarea share one grid cell, so the textarea sits exactly on top. */}
-          <div className="grid w-max shrink-0">
+          <div className="grid min-w-max flex-1">
             <pre
               aria-hidden
               className={cn(
                 editorText,
-                "pointer-events-none col-start-1 row-start-1 p-4 whitespace-pre"
+                "pointer-events-none col-start-1 row-start-1 px-4 py-4 pr-8 whitespace-pre"
               )}
             >
               <HighlightedCode code={source} />
@@ -513,12 +966,17 @@ export function CodePlayground({
               }}
               onKeyDown={handleKeyDown}
               onKeyUp={(event) => revealCaret(event.currentTarget)}
+              onSelect={(event) => revealCaret(event.currentTarget)}
               rows={1}
               spellCheck={false}
               autoCapitalize="off"
               autoCorrect="off"
               wrap="off"
-              aria-label={`${title} code editor`}
+              aria-label={
+                isMulti
+                  ? `${title}: ${activeName} code editor`
+                  : `${title} code editor`
+              }
               className={cn(
                 editorText,
                 "col-start-1 row-start-1 h-full w-full resize-none overflow-hidden bg-transparent p-4 whitespace-pre text-transparent caret-foreground outline-none selection:bg-primary/25"
@@ -529,9 +987,18 @@ export function CodePlayground({
       </ScrollArea>
 
       <div className="border-t bg-muted/50 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            {shown === null ? "Run code to see output" : "Output"}
+        <div className="flex min-h-9 items-center justify-between gap-2">
+          <p className="m-0 min-w-0 text-xs leading-5 text-muted-foreground">
+            {shown === null
+              ? challenge
+                ? "Run tests to check your solution"
+                : "Run code to see output"
+              : challengeView?.kind === "summary"
+                ? "Test results"
+                : challengeView?.kind === "case"
+                  ? `Case ${challengeView.index + 1} of ${challengeView.total}`
+                  : "Output"}
+            {isMulti && <span className="font-mono"> · {entryName}</span>}
           </p>
           <span className="flex items-center gap-2">
             {(edited || lines !== null) && (
@@ -550,31 +1017,39 @@ export function CodePlayground({
               title="Run (Ctrl/Cmd + Enter)"
             >
               <Play aria-hidden="true" data-icon="inline-start" />
-              {running ? "Running…" : "Run"}
+              {running ? "Running…" : challenge ? "Run tests" : "Run"}
             </Button>
           </span>
         </div>
 
         {/* Always mounted so screen readers announce output when it appears */}
         <div aria-live="polite" className={cn(shown !== null && "mt-2")}>
-          {shown !== null &&
-            (shown.length === 0 ? (
+          {shown !== null && (
+            challengeView?.kind === "case" ? (
+              <div className="max-h-64 w-full space-y-2 overflow-y-auto">
+                <ResultValueCard label="Input" value={challengeView.input} />
+                <ResultValueCard label="Expected" value={challengeView.expected} />
+                <ResultValueCard
+                  label="Your Output"
+                  value={challengeView.output}
+                  error={challengeView.outputIsError}
+                  requirementError={challengeView.requirementError}
+                  logs={challengeView.logs}
+                />
+              </div>
+            ) : challengeView?.kind === "summary" ? (
+              <p className="m-0 text-sm leading-6 text-emerald-700 dark:text-emerald-400">
+                {shown.map((line) => line.text).join("\n")}
+              </p>
+            ) : shown.length === 0 ? (
               <p className={cn(editorText, "text-muted-foreground")}>
                 {running ? "Running…" : "(no output)"}
               </p>
             ) : (
-              <ScrollArea
-                autoHide
-                orientation="both"
-                className="max-h-40 w-full"
-                style={{
-                  height: Math.min(
-                    shown.length * OUTPUT_LINE_HEIGHT + OUTPUT_VERTICAL_PADDING,
-                    OUTPUT_MAX_HEIGHT
-                  ),
-                }}
-              >
-                <div className="w-max min-w-full pr-2.5 pb-2.5">
+              // Plain overflow-auto: it grows with the output up to max-h-40, then scrolls
+              // up/down, and scrolls left/right when a line is wider than the box
+              <div className="max-h-40 w-full overflow-auto">
+                <div className="w-max min-w-full">
                   {shown.map((line, index) => (
                     <pre
                       key={index}
@@ -583,16 +1058,17 @@ export function CodePlayground({
                         "whitespace-pre",
                         levelClasses[line.level],
                         isPreview &&
-                          (line.level === "log" || line.level === "info") &&
-                          "text-muted-foreground"
+                        (line.level === "log" || line.level === "info") &&
+                        "text-muted-foreground"
                       )}
                     >
                       {line.text}
                     </pre>
                   ))}
                 </div>
-              </ScrollArea>
-            ))}
+              </div>
+            )
+          )}
         </div>
       </div>
     </figure>
