@@ -1,6 +1,8 @@
 // lessons/design-patterns/factory/
 
 import { ContentWithToc } from "@/components/layout/content-with-toc";
+import Link from "next/link";
+import { buttonVariants } from "@workspace/ui/components/button";
 import {
   Code,
   CodeBlock,
@@ -362,6 +364,28 @@ console.log(unit.items[1].href);
           plain factory function covers most everyday cases.
         </Note>
       </Section>
+
+      <section className="mt-24 border-t pt-10">
+        <h2
+          id="ready-for-the-quiz"
+          data-toc-space="true"
+          data-toc-active-at-bottom="true"
+          className="mb-4 scroll-mt-24 font-heading text-3xl leading-tight tracking-tight sm:text-4xl"
+        >
+          Ready for the quiz?
+        </h2>
+        <P>
+          Put this lesson into practice with a short quiz of coding exercises and
+          quick knowledge checks. The lesson is only marked as done once you
+          complete the quiz.
+        </P>
+        <Link
+          href="/js/lessons/design-patterns/factory/quiz"
+          className={buttonVariants({ size: "lg" })}
+        >
+          Start the quiz
+        </Link>
+      </section>
     </ContentWithToc>
   );
 }

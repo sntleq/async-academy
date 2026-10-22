@@ -1,6 +1,7 @@
 export interface Lesson {
   title: string;
   slug: string;
+  unitSlug: string;
   href: string;
 }
 
@@ -14,7 +15,7 @@ type LessonSpec = readonly [slug: string, title: string];
 
 // Factory: builds a lesson so nobody ever types an href by hand
 function createLesson(unitSlug: string, [slug, title]: LessonSpec): Lesson {
-  return { title, slug, href: `/js/lessons/${unitSlug}/${slug}` };
+  return { title, slug, unitSlug, href: `/js/lessons/${unitSlug}/${slug}` };
 }
 
 // Factory: builds a unit and all of its lessons

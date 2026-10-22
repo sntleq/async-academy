@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { Moon, Sun } from "lucide-react";
+import { Code2, LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { signOut } from "firebase/auth";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { useAuth } from "@/components/auth/auth-provider";
+import { getFirebaseClient } from "@/lib/firebase/client";
 
 const subscribeToNothing = () => () => {};
 const getMountedSnapshot = () => true;
@@ -16,6 +19,7 @@ const getServerMountedSnapshot = () => false;
 export function SiteHeader() {
   const { resolvedTheme, setTheme } = useTheme();
   const pathname = usePathname();
+  const { user, loading: authLoading } = useAuth();
   const mounted = useSyncExternalStore(
     subscribeToNothing,
     getMountedSnapshot,
@@ -41,7 +45,22 @@ export function SiteHeader() {
             pathname === "/js" && "text-primary"
           )}
         >
-          Learn JavaScript
+          <span className="sm:hidden">Learn</span>
+          <span className="hidden sm:inline">Learn JavaScript</span>
+        </Link>
+        <Link
+          href="/playground"
+          aria-label="Open the Coding Playground"
+          title="Coding Playground"
+          className={cn(
+            "ml-1 flex h-full items-center gap-1 px-1 text-xs leading-none font-medium whitespace-nowrap transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring sm:ml-2 sm:px-2 sm:text-sm",
+            pathname === "/playground" && "text-primary"
+          )}
+        >
+          <Code2 aria-hidden="true" className="size-3.5 sm:hidden" />
+          <span className="sm:hidden">Play</span>
+          <span className="hidden lg:inline">Coding Playground</span>
+          <span className="hidden sm:inline lg:hidden">Playground</span>
         </Link>
       </div>
       <div className="ml-2 flex shrink-0 items-center gap-1 sm:gap-3">
@@ -62,6 +81,28 @@ export function SiteHeader() {
             <Moon aria-hidden="true" className="size-5" />
           )}
         </Button>
+        {!authLoading && (user ? (
+          <>
+            <span className="hidden max-w-36 truncate text-xs text-muted-foreground sm:block">
+              {user.email}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                const client = getFirebaseClient();
+                if (client) void signOut(client.auth);
+              }}
+            >
+              <LogOut aria-hidden="true" data-icon="inline-start" />
+              Sign out
+            </Button>
+          </>
+        ) : (
+          <Button nativeButton={false} render={<Link href="/login" />}>
+            Sign in
+          </Button>
+        ))}
       </div>
     </header>
   );

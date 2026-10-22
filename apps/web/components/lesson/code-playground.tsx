@@ -6,8 +6,9 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type FormEvent,
 } from "react";
-import { Play } from "lucide-react";
+import { Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
@@ -211,6 +212,7 @@ export interface ChallengeTestCase {
   args: unknown[];
   expected: unknown;
   hidden?: boolean;
+  preserveArgs?: boolean;
 }
 
 // The variable the solution has to return, instead of returning an expression directly.
@@ -258,11 +260,15 @@ function isCaseResults(value: unknown): value is CaseResult[] {
 // Runs inside the worker, right after the learner's code. It sees the learner's
 // functions as globals and reports one result per test case.
 function createChallengeHarness({ functionName, testCases }: PlaygroundChallenge) {
+  if (!/^[A-Za-z_$][\w$]*$/.test(functionName)) {
+    throw new Error("Challenge functionName must be a JavaScript identifier");
+  }
+
   return `
 ;(() => {
   const cases = ${JSON.stringify(testCases)};
-  const name = ${JSON.stringify(functionName)};
-  const candidate = globalThis[name];
+  const candidate =
+    typeof ${functionName} === "function" ? ${functionName} : undefined;
   const levels = ["log", "info", "warn", "error"];
 
   const show = (value) => {
@@ -290,7 +296,8 @@ function createChallengeHarness({ functionName, testCases }: PlaygroundChallenge
     );
   };
 
-  const results = cases.map(({ args, expected }) => {
+  const results = cases.map(({ args, expected, preserveArgs = false }) => {
+    const originalArgs = preserveArgs ? JSON.stringify(args) : null;
     // Collect console output per case, so one case's logs never end up in another's
     const logs = [];
     const original = {};
@@ -302,10 +309,16 @@ function createChallengeHarness({ functionName, testCases }: PlaygroundChallenge
 
     try {
       if (typeof candidate !== "function") {
-        return { passed: false, actual: "", error: name + " is not a function", logs };
+        return { passed: false, actual: "", error: ${JSON.stringify(functionName)} + " is not a function", logs };
       }
       const actual = candidate(...args);
-      return { passed: same(actual, expected), actual: show(actual), error: null, logs };
+      const argsPreserved = originalArgs === null || JSON.stringify(args) === originalArgs;
+      return {
+        passed: same(actual, expected) && argsPreserved,
+        actual: show(actual),
+        error: argsPreserved ? null : "Input was mutated",
+        logs,
+      };
     } catch (error) {
       const text = error instanceof Error ? error.name + ": " + error.message : "Uncaught " + show(error);
       return { passed: false, actual: "", error: text, logs };
@@ -520,21 +533,30 @@ interface CodePlaygroundProps {
   // (the first file when omitted).
   files?: Files;
   entry?: string;
+  // When set, other files stay visible as read-only context for a challenge.
+  editableFile?: string;
   title?: string;
   // Shown before the first run so the page isn't empty; replaced by real output.
   output?: string;
   challenge?: PlaygroundChallenge;
   onChallengeResult?: (passed: boolean | null) => void;
+  allowFileManagement?: boolean;
+  maxFiles?: number;
+  minEditorHeight?: number;
 }
 
 export function CodePlayground({
                                  code = "",
                                  files,
                                  entry,
+                                 editableFile,
                                  title = "Example",
                                  output,
                                  challenge,
                                  onChallengeResult,
+                                 allowFileManagement = false,
+                                 maxFiles = 5,
+                                 minEditorHeight = 0,
                                }: CodePlaygroundProps) {
   const isMulti = files !== undefined;
   const original: Files = files
@@ -542,14 +564,21 @@ export function CodePlayground({
       Object.entries(files).map(([name, text]) => [name, text.trim()])
     )
     : { [SCRIPT]: code.trim() };
-  const names = Object.keys(original);
-  const entryName = entry && entry in original ? entry : names[0]!;
+  const originalNames = Object.keys(original);
+  const originalEntry = entry && entry in original ? entry : originalNames[0]!;
 
   const [sources, setSources] = useState<Files>(original);
-  const [activeName, setActiveName] = useState(entryName);
+  const [names, setNames] = useState(originalNames);
+  const [activeName, setActiveName] = useState(originalEntry);
+  const [entryName, setEntryName] = useState(originalEntry);
+  const [newFileName, setNewFileName] = useState("");
+  const [fileError, setFileError] = useState("");
+  const activeEntry = entryName in sources ? entryName : names[0]!;
   // The editor below always shows one file; these two stand in for "the" source
   const source = sources[activeName] ?? "";
+  const isEditable = editableFile === undefined || activeName === editableFile;
   const setSource = (value: string) => {
+    if (!isEditable) return;
     setSources((prev) => ({ ...prev, [activeName]: value }));
     onChallengeResult?.(null);
   };
@@ -676,13 +705,18 @@ export function CodePlayground({
     : null;
   const shown = lines ?? preview;
   const isPreview = lines === null && preview !== null;
-  const edited = names.some((name) => sources[name] !== original[name]);
+  const edited =
+    names.length !== originalNames.length ||
+    names.some((name) => sources[name] !== original[name]);
   const lineCount = source.split("\n").length;
   // Size the editor for the longest file so switching tabs doesn't make the page jump
   const editorLines = Math.max(
     ...names.map((name) => (sources[name] ?? "").split("\n").length)
   );
-  const editorHeight = editorLines * EDITOR_LINE_HEIGHT + EDITOR_VERTICAL_PADDING;
+  const editorHeight = Math.max(
+    editorLines * EDITOR_LINE_HEIGHT + EDITOR_VERTICAL_PADDING,
+    minEditorHeight
+  );
 
   async function run() {
     const runner = getRunner("javascript");
@@ -717,7 +751,13 @@ export function CodePlayground({
     };
 
     if (isMulti) {
-      await runner.runFiles(sources, entryName, onLine);
+      const runnableFiles = challenge
+        ? {
+            ...sources,
+            [activeEntry]: `${sources[activeEntry] ?? ""}\n${createChallengeHarness(challenge)}`,
+          }
+        : sources;
+      await runner.runFiles(runnableFiles, activeEntry, onLine);
     } else {
       const runnableSource = challenge
         ? `${source}\n${createChallengeHarness(challenge)}`
@@ -728,7 +768,7 @@ export function CodePlayground({
     if (challenge) {
       const report = buildChallengeReport(
         challenge,
-        source,
+        isMulti ? sources[activeEntry] ?? "" : source,
         challengeResults.value
       );
       setLines((prev) => [...(prev ?? []), ...report.lines]);
@@ -741,9 +781,60 @@ export function CodePlayground({
 
   function reset() {
     setSources(original);
+    setNames(originalNames);
+    setActiveName(originalEntry);
+    setEntryName(originalEntry);
+    setNewFileName("");
+    setFileError("");
     setLines(null);
     setChallengeView(null);
     onChallengeResult?.(null);
+  }
+
+  function addFile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const baseName = newFileName.trim().replace(/\\/g, "/");
+    const name = baseName.endsWith(".js") ? baseName : `${baseName}.js`;
+    if (!baseName) {
+      setFileError("Enter a name for the new file.");
+      return;
+    }
+    if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\.js$/.test(name)) {
+      setFileError("Use letters, numbers, underscores, or dashes, with an optional folder path and .js extension.");
+      return;
+    }
+    if (names.length >= maxFiles) {
+      setFileError(`You can have up to ${maxFiles} files.`);
+      return;
+    }
+    if (name in sources) {
+      setFileError("A file with that name already exists.");
+      return;
+    }
+
+    setSources((current) => ({ ...current, [name]: "" }));
+    setNames((current) => [...current, name]);
+    setActiveName(name);
+    setNewFileName("");
+    setFileError("");
+    setLines(null);
+    setChallengeView(null);
+  }
+
+  function removeActiveFile() {
+    if (names.length <= 1) return;
+    const nextNames = names.filter((name) => name !== activeName);
+    const nextActive = nextNames[0]!;
+    setSources((current) => {
+      const updated = { ...current };
+      delete updated[activeName];
+      return updated;
+    });
+    setNames(nextNames);
+    setActiveName(nextActive);
+    if (activeEntry === activeName) setEntryName(nextActive);
+    setLines(null);
+    setChallengeView(null);
   }
 
   function switchTab(name: string) {
@@ -912,9 +1003,69 @@ export function CodePlayground({
                   : "text-muted-foreground hover:text-primary"
               )}
             >
-              {name}
+              <span>{name}</span>
+              {name === activeEntry && (
+                <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                  Entry
+                </span>
+              )}
             </button>
           ))}
+        </div>
+      )}
+
+      {allowFileManagement && (
+        <div className="space-y-2 border-b bg-background px-3 py-3 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <form onSubmit={addFile} className="flex min-w-0 flex-1 items-center gap-2">
+              <input
+                aria-label="New JavaScript file name"
+                value={newFileName}
+                onChange={(event) => {
+                  setNewFileName(event.target.value);
+                  setFileError("");
+                }}
+                placeholder="helpers.js"
+                maxLength={80}
+                className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-56"
+              />
+              <div className="flex shrink-0 items-center gap-2">
+                <Button type="submit" disabled={names.length >= maxFiles}>
+                  <Plus aria-hidden="true" data-icon="inline-start" />
+                  Add file
+                </Button>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {names.length}/{maxFiles}
+                </span>
+              </div>
+            </form>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={activeEntry === activeName}
+                onClick={() => {
+                  setEntryName(activeName);
+                  setLines(null);
+                  setChallengeView(null);
+                }}
+              >
+                {activeEntry === activeName ? "Entry file" : "Use as entry"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={`Remove ${activeName}`}
+                title={`Remove ${activeName}`}
+                disabled={names.length <= 1}
+                onClick={removeActiveFile}
+              >
+                <Trash2 aria-hidden="true" className="size-4 shrink-0" />
+                <span>Remove</span>
+              </Button>
+            </div>
+          </div>
+          {fileError && <p role="alert" className="m-0 text-xs text-destructive">{fileError}</p>}
         </div>
       )}
 
@@ -959,6 +1110,7 @@ export function CodePlayground({
                 releaseTab.current = false;
               }}
               value={source}
+              readOnly={!isEditable}
               onChange={(event) => {
                 const textarea = event.currentTarget;
                 setSource(textarea.value);
@@ -979,7 +1131,8 @@ export function CodePlayground({
               }
               className={cn(
                 editorText,
-                "col-start-1 row-start-1 h-full w-full resize-none overflow-hidden bg-transparent p-4 whitespace-pre text-transparent caret-foreground outline-none selection:bg-primary/25"
+                "col-start-1 row-start-1 h-full w-full resize-none overflow-hidden bg-transparent p-4 whitespace-pre text-transparent caret-foreground outline-none selection:bg-primary/25",
+                !isEditable && "cursor-default"
               )}
             />
           </div>
@@ -998,7 +1151,7 @@ export function CodePlayground({
                 : challengeView?.kind === "case"
                   ? `Case ${challengeView.index + 1} of ${challengeView.total}`
                   : "Output"}
-            {isMulti && <span className="font-mono"> · {entryName}</span>}
+            {isMulti && <span className="font-mono"> · {activeEntry}</span>}
           </p>
           <span className="flex items-center gap-2">
             {(edited || lines !== null) && (

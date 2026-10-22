@@ -6,14 +6,19 @@ import {
   type PlaygroundChallenge,
 } from "@/components/lesson/code-playground";
 import { Code } from "@/components/lesson/lesson-ui";
+import type { Files } from "@/lib/runner";
 
 export function CodingChallenge({
                                   starterCode,
+                                  files,
+                                  entry,
                                   challenge,
                                   onResult,
                                   title = "Your solution",
                                 }: {
-  starterCode: string;
+  starterCode?: string;
+  files?: Files;
+  entry?: string;
   challenge: PlaygroundChallenge;
   onResult: (passed: boolean | null) => void;
   title?: string;
@@ -82,6 +87,9 @@ export function CodingChallenge({
 
       <CodePlayground
         code={starterCode}
+        files={files}
+        entry={entry}
+        editableFile={files ? entry ?? Object.keys(files)[0] : undefined}
         title={title}
         challenge={challenge}
         onChallengeResult={onResult}

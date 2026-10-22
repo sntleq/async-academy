@@ -12,6 +12,8 @@ import {
 } from "@/components/lesson/lesson-pager";
 import { P } from "@/components/lesson/lesson-ui";
 import { Curriculum, type Lesson } from "@/lib/lessons";
+import { useAuth } from "@/components/auth/auth-provider";
+import { saveLessonCompletion } from "@/lib/firebase/progress";
 
 export interface LessonQuizQuestion {
   typeLabel: string;
@@ -38,6 +40,9 @@ export function LessonQuiz({
   const [stepIndex, setStepIndex] = useState(0);
   const [passed, setPassed] = useState<boolean | null>(null);
   const [complete, setComplete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const { user, markLessonCompleted, unmarkLessonCompleted } = useAuth();
   const quizRef = useRef<HTMLElement>(null);
   const question = questions[stepIndex];
   const nextLesson = Curriculum.getInstance().getAdjacent(lesson.href).next;
@@ -49,10 +54,23 @@ export function LessonQuiz({
     }
   }, [stepIndex, complete]);
 
-  function continueQuiz() {
+  async function continueQuiz() {
     if (passed !== true) return;
 
     if (stepIndex === questions.length - 1) {
+      if (user) {
+        setSaving(true);
+        setSaveError(false);
+        markLessonCompleted(lesson);
+        try {
+          await saveLessonCompletion(user.uid, lesson);
+        } catch {
+          setSaveError(true);
+          unmarkLessonCompleted(lesson);
+        } finally {
+          setSaving(false);
+        }
+      }
       setComplete(true);
       return;
     }
@@ -113,6 +131,44 @@ export function LessonQuiz({
           <p className="mx-auto mb-7 max-w-md text-balance leading-7 text-muted-foreground">
             {completionMessage}
           </p>
+          {user && !saveError && (
+            <p className="mb-6 text-sm text-primary">Progress saved to your account.</p>
+          )}
+          {saveError && (
+            <div role="status" className="mx-auto mb-6 max-w-md text-sm text-destructive">
+              Quiz complete, but your progress could not be saved. Check your connection
+              and try again.
+              <button
+                type="button"
+                className="ml-2 underline underline-offset-4"
+                onClick={async () => {
+                  if (!user) return;
+                  setSaving(true);
+                  markLessonCompleted(lesson);
+                  try {
+                    await saveLessonCompletion(user.uid, lesson);
+                    setSaveError(false);
+                  } catch {
+                    setSaveError(true);
+                    unmarkLessonCompleted(lesson);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Try again"}
+              </button>
+            </div>
+          )}
+          {!user && (
+            <p className="mb-6 text-sm text-muted-foreground">
+              <Link href="/login" className="text-primary underline underline-offset-4">
+                Sign in
+              </Link>{" "}
+              to save this lesson to your progress.
+            </p>
+          )}
           <Link
             href={nextLesson?.href ?? lesson.href}
             className={buttonVariants({ size: "lg" })}
@@ -185,7 +241,7 @@ export function LessonQuiz({
                       ? "Quiz complete"
                       : questions[stepIndex + 1]!.title
                   }
-                  disabled={passed !== true}
+                  disabled={passed !== true || saving}
                   onClick={continueQuiz}
                 />
               </nav>

@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 import { cn } from "@workspace/ui/lib/utils";
+import { Check } from "lucide-react";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Curriculum } from "@/lib/lessons";
+import { useAuth } from "@/components/auth/auth-provider";
 
 const nav = Curriculum.getInstance().getUnits();
 
@@ -19,6 +21,10 @@ export function SidebarNavigation({
   showLabel?: boolean;
 }) {
   const pathname = usePathname();
+  const { user, completedLessons } = useAuth();
+  const completedKeys = new Set(
+    completedLessons.map((lesson) => `${lesson.unitSlug}/${lesson.lessonSlug}`)
+  );
 
   return (
     <nav className="flex flex-col gap-8">
@@ -37,13 +43,19 @@ export function SidebarNavigation({
                   href={item.href}
                   onClick={onNavigate}
                   className={cn(
-                    "block rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-primary dark:hover:bg-accent",
+                    "flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-primary dark:hover:bg-accent",
                     pathname === item.href &&
                       "bg-accent font-medium text-primary hover:bg-accent dark:bg-muted dark:hover:bg-muted"
                   )}
                   aria-current={pathname === item.href ? "page" : undefined}
                 >
-                  {item.title}
+                  <span>{item.title}</span>
+                  {user && completedKeys.has(`${item.unitSlug}/${item.slug}`) && (
+                    <Check
+                      aria-label="Completed"
+                      className="size-4 shrink-0 text-primary"
+                    />
+                  )}
                 </Link>
               </li>
             ))}
